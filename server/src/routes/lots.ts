@@ -2,6 +2,7 @@
 import express, { Request, Response } from 'express';
 import { Lot } from '../models/Lot';
 import { Part } from '../models/Part';
+import { User } from '../models/User';
 import { authenticate, authorize } from '../middleware/auth';
 
 const router = express.Router();
@@ -123,26 +124,84 @@ router.get('/:id', authenticate, async (req: any, res: Response) => {
 });
 
 /**
+ * GET /api/lots/qr/:id
+ * - Get lot by ID for QR scanning (public endpoint, no auth required)
+ */
+router.get('/qr/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const lot = await Lot.findOne({ id: id.toUpperCase() });
+
+    if (!lot) {
+      return res.status(404).json({ success: false, message: 'Lot not found' });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: lot
+    });
+  } catch (err: any) {
+    console.error('GET /api/lots/qr/:id error:', err);
+    return res.status(500).json({ success: false, message: 'Server error fetching lot' });
+  }
+});
+
+/**
  * PUT /api/lots/:id/status
- * - Update lot status (Depot Staff Only)
+ * - Update lot status with audit trail (Depot Staff Only)
  */
 router.put('/:id/status', authenticate, authorize('depot-staff'), async (req: any, res: Response) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, notes, sampleCheck } = req.body;
+    const userId = req.user.id;
 
-    if (!['pending', 'verified', 'rejected'].includes(status)) {
+    if (!['pending', 'verified', 'rejected', 'accepted', 'held'].includes(status)) {
       return res.status(400).json({ success: false, message: 'Invalid status' });
     }
 
-    const lot = await Lot.findOneAndUpdate(
-      { id: id.toUpperCase() },
-      { status, updatedAt: new Date() },
-      { new: true }
-    );
-
+    const lot = await Lot.findOne({ id: id.toUpperCase() });
     if (!lot) {
       return res.status(404).json({ success: false, message: 'Lot not found' });
+    }
+
+    // Add audit trail entry
+    lot.auditTrail.push({
+      timestamp: new Date(),
+      actorId: userId,
+      actorName: `${req.user.firstName} ${req.user.lastName}`,
+      action: 'status_updated',
+      details: `Status changed from ${lot.status} to ${status}`,
+      metadata: {
+        previousStatus: lot.status,
+        newStatus: status,
+        notes,
+        sampleCheck
+      }
+    });
+
+    // Update lot status
+    lot.status = status;
+    lot.updatedAt = new Date();
+    await lot.save();
+
+    // Add to user history
+    const user = await User.findOne({ id: userId });
+    if (user) {
+      user.history.push({
+        timestamp: new Date(),
+        action: 'update_lot_status',
+        targetType: 'lot',
+        targetId: lot.id,
+        details: `Updated lot ${lot.lotNumber} status to ${status}`,
+        metadata: {
+          previousStatus: lot.status,
+          newStatus: status,
+          notes,
+          sampleCheck
+        }
+      });
+      await user.save();
     }
 
     return res.status(200).json({

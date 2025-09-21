@@ -1,6 +1,22 @@
 // backend/models/Lot.ts
 import mongoose, { Document, Schema, Model } from 'mongoose';
 
+export interface AuditEntry {
+  timestamp: Date;
+  actorId: string;
+  actorName: string;
+  action: string;
+  details?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface QrToken {
+  token: string;
+  generatedAt: Date;
+  expiresAt: Date;
+  generatedBy: string;
+}
+
 export interface ILot extends Document {
   id: string;
   partName: string;
@@ -9,9 +25,11 @@ export interface ILot extends Document {
   supplyDate: Date;
   manufacturingDate: Date;
   warrantyPeriod: string;
-  status: 'pending' | 'verified' | 'rejected';
+  status: 'pending' | 'verified' | 'rejected' | 'accepted' | 'held';
   vendorId: string;
-  qrCode?: string;
+  qrCode?: string; // Keep for backward compatibility, but will be deprecated
+  auditTrail: AuditEntry[];
+  qrTokens: QrToken[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -28,9 +46,23 @@ const lotSchema = new Schema<ILot>({
   supplyDate: { type: Date, required: true },
   manufacturingDate: { type: Date, required: true },
   warrantyPeriod: { type: String, required: true },
-  status: { type: String, enum: ['pending', 'verified', 'rejected'], default: 'pending' },
+  status: { type: String, enum: ['pending', 'verified', 'rejected', 'accepted', 'held'], default: 'pending' },
   vendorId: { type: String, required: true, ref: 'User' },
-  qrCode: { type: String }
+  qrCode: { type: String }, // Deprecated - keeping for backward compatibility
+  auditTrail: [{
+    timestamp: { type: Date, default: Date.now },
+    actorId: { type: String, required: true },
+    actorName: { type: String, required: true },
+    action: { type: String, required: true },
+    details: { type: String },
+    metadata: { type: Schema.Types.Mixed }
+  }],
+  qrTokens: [{
+    token: { type: String, required: true },
+    generatedAt: { type: Date, default: Date.now },
+    expiresAt: { type: Date, required: true },
+    generatedBy: { type: String, required: true }
+  }]
 }, {
   timestamps: true
 });

@@ -13,7 +13,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { LogOut, Lock, Train, QrCode } from 'lucide-react';
 
 const Index = () => {
-  const { user, logout, isLoading } = useAuth();
+  const { user, logout, isLoading, isOfflineMode } = useAuth();
   const [showLogin, setShowLogin] = useState(true);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
 
@@ -95,6 +95,11 @@ const Index = () => {
           </div>
           
           <div className="flex items-center space-x-3">
+            {isOfflineMode && (
+              <Badge variant="destructive" className="bg-yellow-500/20 text-yellow-200 border-yellow-400/30">
+                Offline Mode
+              </Badge>
+            )}
             <Badge variant="secondary" className="bg-white/10 text-white border-white/20">
               {user.firstName} {user.lastName}
             </Badge>

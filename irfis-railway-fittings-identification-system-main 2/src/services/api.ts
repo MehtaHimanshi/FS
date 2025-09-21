@@ -57,10 +57,17 @@ class ApiService {
     }
 
     try {
+      // Add timeout for requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const response = await fetch(url, {
         ...options,
         headers,
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       const data = await response.json();
 
@@ -179,10 +186,53 @@ class ApiService {
     return this.request(`/lots/${lotId}`);
   }
 
-  async updateLotStatus(lotId: string, status: 'pending' | 'verified' | 'rejected') {
+  async getLotById(lotId: string) {
+    // Use public QR endpoint for scanning (no auth required)
+    const response = await fetch(`${this.baseURL}/lots/qr/${lotId}`);
+    return response.json();
+  }
+
+  async updateLotStatus(lotId: string, status: 'pending' | 'verified' | 'rejected' | 'accepted' | 'held', notes?: string, sampleCheck?: any) {
     return this.request(`/lots/${lotId}/status`, {
       method: 'PUT',
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, notes, sampleCheck }),
+    });
+  }
+
+  // New workflow endpoints
+  async installLot(lotId: string, installationData: {
+    location: string;
+    section: string;
+    installationDate?: string;
+    notes?: string;
+  }) {
+    return this.request(`/lots/${lotId}/install`, {
+      method: 'POST',
+      body: JSON.stringify(installationData),
+    });
+  }
+
+  async inspectLot(lotId: string, inspectionData: {
+    condition: 'good' | 'worn' | 'replace';
+    notes?: string;
+    photos?: string[];
+    nextInspectionDue?: string;
+  }) {
+    return this.request(`/lots/${lotId}/inspection`, {
+      method: 'POST',
+      body: JSON.stringify(inspectionData),
+    });
+  }
+
+  async requestReplacement(lotId: string, requestData: {
+    reason: string;
+    description: string;
+    photos?: string[];
+    priority?: 'low' | 'medium' | 'high' | 'urgent';
+  }) {
+    return this.request(`/lots/${lotId}/replacement-request`, {
+      method: 'POST',
+      body: JSON.stringify(requestData),
     });
   }
 
@@ -301,6 +351,18 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify({ type, id }),
     });
+  }
+
+  // New ephemeral QR endpoints
+  async generateEphemeralQR(lotId: string) {
+    return this.request(`/lots/${lotId}/generate-qr`, {
+      method: 'POST',
+    });
+  }
+
+  async getLotWithToken(lotId: string, token?: string) {
+    const url = token ? `/lots/${lotId}?token=${token}` : `/lots/${lotId}`;
+    return this.request(url);
   }
 
   async scanQRCode(qrData: string) {

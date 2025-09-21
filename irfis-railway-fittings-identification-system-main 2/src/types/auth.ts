@@ -17,6 +17,7 @@ export interface AuthContextType {
   logout: () => void;
   changePassword: (oldPassword: string, newPassword: string) => Promise<boolean>;
   isLoading: boolean;
+  isOfflineMode: boolean;
 }
 
 export interface CreateUserData {

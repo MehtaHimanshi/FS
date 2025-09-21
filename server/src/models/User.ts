@@ -2,6 +2,15 @@ import mongoose, { Document, Schema } from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { UserRole, ROLE_CODES } from '../types';
 
+export interface UserHistoryEntry {
+  timestamp: Date;
+  action: string;
+  targetType: 'lot' | 'part' | 'inspection' | 'installation';
+  targetId: string;
+  details?: string;
+  metadata?: Record<string, any>;
+}
+
 export interface IUser extends Document {
   id: string;
   firstName: string;
@@ -10,6 +19,7 @@ export interface IUser extends Document {
   dateOfBirth: string;
   password: string;
   isFirstLogin: boolean;
+  history: UserHistoryEntry[];
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -49,7 +59,15 @@ const userSchema = new Schema<IUser>({
   isFirstLogin: {
     type: Boolean,
     default: true
-  }
+  },
+  history: [{
+    timestamp: { type: Date, default: Date.now },
+    action: { type: String, required: true },
+    targetType: { type: String, enum: ['lot', 'part', 'inspection', 'installation'], required: true },
+    targetId: { type: String, required: true },
+    details: { type: String },
+    metadata: { type: Schema.Types.Mixed }
+  }]
 }, {
   timestamps: true
 });

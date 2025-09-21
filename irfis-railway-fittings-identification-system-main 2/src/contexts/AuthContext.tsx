@@ -30,20 +30,49 @@ const generateDefaultPassword = (firstName: string, dateOfBirth: string): string
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
   const { toast } = useToast();
 
   // Initialize authentication
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        // Check if we have a token and try to get current user
+        // First, try to restore user from localStorage
+        const storedUser = localStorage.getItem('irfis-current-user');
         const token = localStorage.getItem('irfis-token');
-        if (token) {
-          const currentUser = await apiService.getCurrentUser();
-          setUser(currentUser);
+        
+        if (storedUser && token) {
+          try {
+            // Parse the stored user data
+            const userData = JSON.parse(storedUser);
+            setUser(userData);
+            
+            // Try to validate the token with the backend (optional)
+            // If backend is not available, we'll still keep the user logged in
+            try {
+              const currentUser = await apiService.getCurrentUser();
+              // Update user data if backend responds
+              const typedUser = {
+                ...currentUser,
+                role: currentUser.role as UserRole
+              };
+              setUser(typedUser);
+              localStorage.setItem('irfis-current-user', JSON.stringify(typedUser));
+            } catch (backendError) {
+              // Backend is not available, but we'll keep the user logged in
+              console.log('Backend not available, using cached user data');
+              setIsOfflineMode(true);
+            }
+          } catch (parseError) {
+            // Invalid stored user data, clear everything
+            console.error('Invalid stored user data:', parseError);
+            apiService.clearToken();
+            localStorage.removeItem('irfis-current-user');
+          }
         }
       } catch (error) {
-        // Token is invalid or expired, clear it
+        console.error('Auth initialization error:', error);
+        // Only clear token if there's a critical error
         apiService.clearToken();
         localStorage.removeItem('irfis-current-user');
       } finally {
@@ -58,8 +87,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setIsLoading(true);
     try {
       const authResponse = await apiService.login(userId, password);
-      setUser(authResponse.user);
-      localStorage.setItem('irfis-current-user', JSON.stringify(authResponse.user));
+      const typedUser = {
+        ...authResponse.user,
+        role: authResponse.user.role as UserRole
+      };
+      setUser(typedUser);
+      localStorage.setItem('irfis-current-user', JSON.stringify(typedUser));
       
       toast({
         title: "Login Successful",
@@ -124,7 +157,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       login,
       logout,
       changePassword,
-      isLoading
+      isLoading,
+      isOfflineMode
     }}>
       {children}
     </AuthContext.Provider>

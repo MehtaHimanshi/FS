@@ -13,6 +13,8 @@ import lotRoutes from './routes/lots';
 import partRoutes from './routes/parts';
 import inspectionRoutes from './routes/inspections';
 import qrRoutes from './routes/qr';
+import ephemeralQrRoutes from './routes/ephemeralQr';
+import lotWorkflowRoutes from './routes/lotWorkflows';
 import uploadRoutes from './routes/upload';
 import { errorHandler } from './middleware/errorHandler';
 import { notFound } from './middleware/notFound';
@@ -44,7 +46,9 @@ app.use(limiter);
 app.use(cors({
   origin: [
     process.env.FRONTEND_URL || 'http://localhost:5173',
-    'http://localhost:8080'
+    'http://localhost:8080',
+    'http://localhost:8081',
+    'http://localhost:8082'
   ],
   credentials: true
 }));
@@ -67,6 +71,8 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/lots', lotRoutes);
+app.use('/api/lots', lotWorkflowRoutes); // Additional lot workflow endpoints
+app.use('/api/lots', ephemeralQrRoutes); // Ephemeral QR endpoints under /api/lots
 app.use('/api/parts', partRoutes);
 app.use('/api/inspections', inspectionRoutes);
 app.use('/api/qr', qrRoutes);
